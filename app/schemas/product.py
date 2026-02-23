@@ -9,6 +9,7 @@ class ProductBase(BaseModel):
     sku: str = Field(..., min_length=1, max_length=100)
     description: str | None = Field(default=None, max_length=1000)
     unit: str = Field(default="pcs", max_length=50)
+    stock: float = Field(default=0.0, ge=0)
 
 
 class ProductCreate(ProductBase):
@@ -20,6 +21,7 @@ class ProductUpdate(BaseModel):
     sku: str | None = Field(default=None, min_length=1, max_length=100)
     description: str | None = Field(default=None, max_length=1000)
     unit: str | None = Field(default=None, max_length=50)
+    stock: float | None = Field(default=None, ge=0)
 
 
 class ProductResponse(ProductBase):

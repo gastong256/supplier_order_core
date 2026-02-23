@@ -17,6 +17,7 @@ class Product(BaseModel):
     sku: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     unit: Mapped[str] = mapped_column(String(50), nullable=False, default="pcs")
+    stock: Mapped[float] = mapped_column(nullable=False, server_default="0")
 
     supplier_products: Mapped[list["SupplierProduct"]] = relationship(
         "SupplierProduct",
