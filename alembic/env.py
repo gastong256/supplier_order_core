@@ -9,12 +9,12 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from app.core.config import settings
 from app.db.base import Base
 
-# Import all models so Alembic can detect schema changes.
+# Import all models so Alembic can detect schema changes for autogenerate.
 import app.models  # noqa: F401
 
 config = context.config
 
-# Override sqlalchemy.url with the value from settings.
+# Override sqlalchemy.url with the value from settings (reads from .env).
 config.set_main_option("sqlalchemy.url", str(settings.DATABASE_URL))
 
 if config.config_file_name is not None:

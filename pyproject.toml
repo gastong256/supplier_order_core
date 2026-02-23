@@ -69,3 +69,6 @@ addopts = "-v --cov=app --cov-report=term-missing"
 
 [tool.coverage.run]
 omit = ["tests/*", "alembic/*"]
+
+[tool.hatch.build]
+packages = ["supplier_order_core"]
