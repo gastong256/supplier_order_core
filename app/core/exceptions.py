@@ -30,6 +30,11 @@ class ForbiddenError(AppException):
         super().__init__(message, code="FORBIDDEN")
 
 
+class ValidationError(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, code="VALIDATION_ERROR")
+
+
 # ── FastAPI HTTP shortcuts ────────────────────────────────────────────────────
 
 HTTP_401 = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated.")

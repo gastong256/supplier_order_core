@@ -52,6 +52,7 @@ def create_app() -> FastAPI:
             "CONFLICT": status.HTTP_409_CONFLICT,
             "UNAUTHORIZED": status.HTTP_401_UNAUTHORIZED,
             "FORBIDDEN": status.HTTP_403_FORBIDDEN,
+            "VALIDATION_ERROR": status.HTTP_422_UNPROCESSABLE_ENTITY,
         }
         http_status = status_map.get(exc.code, status.HTTP_500_INTERNAL_SERVER_ERROR)
         return JSONResponse(
