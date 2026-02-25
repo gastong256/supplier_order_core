@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -30,3 +31,27 @@ class ProductResponse(ProductBase):
     id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+
+
+# ── CSV Import ────────────────────────────────────────────────────────────────
+
+class ImportRowStatus(str, Enum):
+    IMPORTED = "imported"
+    UPDATED = "updated"
+    ERROR = "error"
+
+
+class ProductImportRowResult(BaseModel):
+    row: int
+    status: ImportRowStatus
+    sku: str | None = None
+    name: str | None = None
+    reason: str | None = None
+
+
+class ProductImportResult(BaseModel):
+    total_rows: int
+    imported: int
+    updated: int
+    errors: int
+    rows: list[ProductImportRowResult]

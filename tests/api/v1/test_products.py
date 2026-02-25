@@ -1,3 +1,5 @@
+import io
+
 import pytest
 from httpx import AsyncClient
 
@@ -73,3 +75,111 @@ async def test_delete_product(client: AsyncClient) -> None:
     assert response.status_code == 204
     get_response = await client.get(f"/api/v1/products/{product_id}")
     assert get_response.status_code == 404
+
+
+# ── CSV import ────────────────────────────────────────────────────────────────
+
+def _csv_file(content: str, filename: str = "products.csv") -> tuple:
+    return ("file", (filename, io.BytesIO(content.encode()), "text/csv"))
+
+
+@pytest.mark.asyncio
+async def test_import_csv_happy_path(client: AsyncClient) -> None:
+    csv_content = "name,sku,description,unit\nGadget X,CSV-001,A gadget,pcs\nTool Y,CSV-002,,kg\n"
+    response = await client.post(
+        "/api/v1/products/import",
+        files=[_csv_file(csv_content)],
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total_rows"] == 2
+    assert data["imported"] == 2
+    assert data["updated"] == 0
+    assert data["errors"] == 0
+    assert data["rows"][0]["status"] == "imported"
+    assert data["rows"][0]["sku"] == "CSV-001"
+
+
+@pytest.mark.asyncio
+async def test_import_csv_upsert(client: AsyncClient) -> None:
+    # First import — creates the product
+    csv_v1 = "name,sku\nOld Name,UPSERT-001\n"
+    await client.post("/api/v1/products/import", files=[_csv_file(csv_v1)])
+
+    # Second import — updates the product
+    csv_v2 = "name,sku\nNew Name,UPSERT-001\n"
+    response = await client.post("/api/v1/products/import", files=[_csv_file(csv_v2)])
+    assert response.status_code == 200
+    data = response.json()
+    assert data["updated"] == 1
+    assert data["imported"] == 0
+    assert data["rows"][0]["status"] == "updated"
+    assert data["rows"][0]["name"] == "New Name"
+
+    # Confirm DB reflects the update
+    products = await client.get("/api/v1/products")
+    names = [p["name"] for p in products.json() if p["sku"] == "UPSERT-001"]
+    assert names == ["New Name"]
+
+
+@pytest.mark.asyncio
+async def test_import_csv_with_row_errors(client: AsyncClient) -> None:
+    csv_content = (
+        "name,sku\n"
+        "Good Product,ERR-001\n"
+        ",ERR-002\n"          # missing name — should error
+        "Another Good,ERR-003\n"
+    )
+    response = await client.post(
+        "/api/v1/products/import",
+        files=[_csv_file(csv_content)],
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["imported"] == 2
+    assert data["errors"] == 1
+    error_row = next(r for r in data["rows"] if r["status"] == "error")
+    assert error_row["row"] == 2
+    assert error_row["reason"] is not None
+
+
+@pytest.mark.asyncio
+async def test_import_csv_missing_required_header(client: AsyncClient) -> None:
+    csv_content = "product_name,code\nWidget,W-001\n"  # wrong headers
+    response = await client.post(
+        "/api/v1/products/import",
+        files=[_csv_file(csv_content)],
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_import_csv_wrong_file_type(client: AsyncClient) -> None:
+    response = await client.post(
+        "/api/v1/products/import",
+        files=[_csv_file("some content", filename="products.txt")],
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_import_csv_bom_encoding(client: AsyncClient) -> None:
+    # UTF-8 BOM prefix — common from Excel exports
+    csv_content = "\ufeffname,sku\nBOM Product,BOM-001\n"
+    response = await client.post(
+        "/api/v1/products/import",
+        files=[_csv_file(csv_content)],  # _csv_file handles encoding
+    )
+    assert response.status_code == 200
+    assert response.json()["imported"] == 1
+
+
+@pytest.mark.asyncio
+async def test_import_csv_empty_rows_ignored(client: AsyncClient) -> None:
+    csv_content = "name,sku\nReal Product,REAL-001\n\n   \n"
+    response = await client.post(
+        "/api/v1/products/import",
+        files=[_csv_file(csv_content)],
+    )
+    assert response.status_code == 200
+    assert response.json()["total_rows"] == 1  # empty rows not counted

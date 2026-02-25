@@ -1,9 +1,10 @@
 import uuid
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, File, UploadFile, status
 
 from app.api.deps import DBSession
-from app.schemas.product import ProductCreate, ProductResponse, ProductUpdate
+from app.core.exceptions import ValidationError
+from app.schemas.product import ProductCreate, ProductImportResult, ProductResponse, ProductUpdate
 from app.services.product import ProductService
 
 router = APIRouter(tags=["products"])
@@ -21,6 +22,17 @@ async def list_products(
 @router.post("", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
 async def create_product(db: DBSession, body: ProductCreate) -> ProductResponse:
     return await ProductService.create_product(db, body)  # type: ignore[return-value]
+
+
+@router.post("/import", response_model=ProductImportResult)
+async def import_products(
+    db: DBSession,
+    file: UploadFile = File(...),
+) -> ProductImportResult:
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise ValidationError("Only .csv files are accepted.")
+    content = await file.read()
+    return await ProductService.import_from_csv(db, content)
 
 
 @router.get("/{product_id}", response_model=ProductResponse)
